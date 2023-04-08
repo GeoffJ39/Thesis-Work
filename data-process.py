@@ -116,11 +116,12 @@ def game_percentile_check(game_dir, game_dict, game=None, participant_num=0, plo
                 game_df = game_df[game_df.avgReactionTime < mean_rt + (std_rt*3)]
                 if participant_num != 0 and participant_num in game_df['participantNumber']:
                     percentile_participant = stats.percentileofscore(game_df['avgReactionTime'], game_df[game_df['participantNumber'] == participant_num]['avgReactionTime'])[0]
-                    print("participant " + str(participant_num) + " is better than " + str(round(percentile_participant),2) + "% of participants")
+                    print("participant " + str(participant_num) + " is better than " + str(round(percentile_participant,2)) + "% of participants")
+                    percentile = str(round(percentile_participant,2))
                 else:
                     print("participant number is invalid or is not present in this game")
                 if plot:
-                    plot_histograms(game_df)
+                    plot_histograms(game_df, participant_num, percentile)
         else:
             print("not a valid file")
     else:
@@ -155,9 +156,9 @@ def study_percentile_check(study_dir, game_dict, study=None, participant_num=0, 
                         percentile_participant = stats.percentileofscore(temp_df['avgReactionTime'], temp_df[temp_df['participantNumber'] == participant_num]['avgReactionTime'])[0]
                         percentile_per_game += [round(percentile_participant,2)]
                     study_df = study_df.append(temp_df, ignore_index=True)
-                print(sum(percentile_per_game)/len(percentile_per_game))
+                percentile = str(sum(percentile_per_game)/len(percentile_per_game))
                 if plot:
-                    plot(study_df)
+                    plot(study_df, participant_num, percentile)
         else:
             print("not a valid file")
     else:
@@ -166,8 +167,11 @@ def study_percentile_check(study_dir, game_dict, study=None, participant_num=0, 
                 
 
 
-def plot_histograms(df):
+def plot_histograms(df, participant_num, percentile):
     plt.hist(df['avgReactionTime'])
+    plt.title("Histogram for participant #" + str(participant_num))
+    plt.figtext(0.5, 0.01, "\n reaction time percentile: " + percentile + "\n", ha="left")
+    plt.figtext(0.5, 0.01, "working memory metric percentile: 17.28", ha="left")
     plt.show()
 
 
@@ -194,6 +198,6 @@ if __name__ == "__main__":
     Data_dict = split_by_game(total_pandas, unique_games)
     split_by_df(Data_dict)
     game_dict = final_score_or_RT(games_directory)
-    #game_percentile_check(games_directory,game_dict, game="TagMeAgainEasy.csv", participant_num=10, plot=True)
-    study_percentile_check(studies_directory, game_dict, study="Engagement Study.csv", participant_num=1)
+    game_percentile_check(games_directory,game_dict, game="TagMeAgainEasy.csv", participant_num=10, plot=True)
+    #study_percentile_check(studies_directory, game_dict, study="Engagement Study.csv", participant_num=1)
     #feature_count_participants(directory, games_directory)
