@@ -1,0 +1,11 @@
+Data-process.py is meant to be editted internally and run depending on given parameters
+
+The main 2 functions are game_percentile_check and study_percentile_check. 
+
+game_percentile_check checks for a participant's performance within a specific game and takes in the main pandas dataframe as an input, along with the games directory, the specific game name, the participant number, and whether we want to plot our results.
+
+study_percentile_check checks for a participant's performance within a specific study, which takes into account their performance on each game in the study separately and takes in the main pandas dataframe as an input, along with the studies directory, the specific study name, the participant number, and whether we want to plot our results.
+
+in terms of the dataframe calculations, the bulk of the calculations are done in build_game_df which takes the original dataframe and produces the filtered dataframe that has a single row of average/total counts for all the measurement metrics per participant. 
+
+

@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
+working_memory_games = ["TagMeAgainEasy"]
+response_inhibition_games = ["TagMeOnly"]
+
 def read_c(filepath, total_pandas):
     df = pd.read_csv(filepath)
     uniq = df.name.unique()
@@ -98,6 +101,42 @@ def final_score_or_RT(game_dir):
                     game_dict[filename[:-4]] = 'FS'
     return game_dict
 
+def build_game_df(df_pd):
+    uniq = df_pd['participantNumber'].unique()
+    game_df = pd.DataFrame(columns=['participantNumber','avgReactionTime', 'numCorrectHits', \
+                                    'numFalseAlarm', 'numMiss', 'numCorrectRejection', 'avgCorrectReactionTime'])
+    for i in range(0,len(uniq)):
+        #per game breakdown of participant num, their avg reaction time, num hits/false alarms/misses/correct rejects, correct reaction time
+        game_df.loc[i] = [uniq[i]] + [df_pd[(df_pd['participantNumber'] == uniq[i]) & (df_pd['reactionTime'] >100)]['reactionTime'].mean()] \
+                    + [len(df_pd[(df_pd['participantNumber'] == uniq[i]) & (df_pd['interactionType'] == "correct hit")])] \
+                    + [len(df_pd[(df_pd['participantNumber'] == uniq[i]) & (df_pd['interactionType'] == "false alarm")])] \
+                    + [len(df_pd[(df_pd['participantNumber'] == uniq[i]) & (df_pd['interactionType'] == "miss")])] \
+                    + [len(df_pd[(df_pd['participantNumber'] == uniq[i]) & ((df_pd['interactionType'] == "correct rejection") \
+                                                                            | (df_pd['interactionType'] == "correct reject"))])] \
+                    + [df_pd[(df_pd['participantNumber'] == uniq[i]) & (df_pd['reactionTime'] >100) \
+                             & (df_pd['interactionType'] == "correct hit")]['reactionTime'].mean()]
+    #add a column for their overall accuracy, calculated using hits + correct rejections / all responses
+    game_df['accuracy'] = (game_df['numCorrectHits'] + game_df['numCorrectRejection']) \
+        /(game_df['numCorrectHits'] + game_df['numCorrectRejection'] + game_df['numMiss'] + game_df['numFalseAlarm'])
+    game_df['FalseAlarmRate'] = game_df['numFalseAlarm']/(game_df['numFalseAlarm'] + game_df['numCorrectRejection'])
+    #filter out outlier reaction times that are 3 standard deviations above the mean
+    mean_rt = game_df['avgReactionTime'].mean()
+    std_rt = game_df['avgReactionTime'].std()
+    game_df = game_df[game_df.avgReactionTime < mean_rt + (std_rt*2)]
+    #add a game_df with the z_scored columns
+    cols = list(game_df.columns)
+    cols.remove('participantNumber')
+    z_game_df = game_df[cols].apply(stats.zscore)
+    z_game_df.columns = ['z_avgReactionTime', 'z_numCorrectHits', 'z_numFalseAlarm', 'z_numMiss', \
+                         'z_numCorrectRejection', 'z_avgCorrectReactionTime', 'z_accuracy', 'z_FalseAlarmRate']
+    game_df['z_avgReactionTime'] = z_game_df['z_avgReactionTime']
+    game_df['z_avgCorrectReactionTime'] = z_game_df['z_avgCorrectReactionTime']
+    game_df['z_accuracy'] = z_game_df['z_accuracy']
+    game_df['z_FalseAlarmRate'] = z_game_df['z_FalseAlarmRate']
+    game_df['workingMemMetric'] = game_df['z_avgReactionTime'] - game_df['z_accuracy']
+    game_df['responseInhibMetric'] = game_df['z_avgReactionTime'] - game_df['z_FalseAlarmRate']
+    return game_df
+
 
 def game_percentile_check(game_dir, game_dict, game=None, participant_num=0, plot=False):
     if game != None and game in os.listdir(game_dir):
@@ -106,22 +145,24 @@ def game_percentile_check(game_dir, game_dict, game=None, participant_num=0, plo
         if os.path.isfile(f):
             if f[-4:] == '.csv' and  game_dict[game[:-4]] == 'RT':
                 df_pd = pd.read_csv(f)
-                uniq = df_pd['participantNumber'].unique()
-                game_df = pd.DataFrame(columns=['participantNumber','avgReactionTime'])
-                for i in range(0,len(uniq)):
-                    game_df.loc[i] = [uniq[i]] + [df_pd[(df_pd['participantNumber'] == uniq[i]) & (df_pd['reactionTime'] >100)]['reactionTime'].mean()]
-                #filter out outlier reaction times that are 3 standard deviations above the mean
-                mean_rt = game_df['avgReactionTime'].mean()
-                std_rt = game_df['avgReactionTime'].std()
-                game_df = game_df[game_df.avgReactionTime < mean_rt + (std_rt*3)]
+                game_df = build_game_df(df_pd)
                 if participant_num != 0 and participant_num in game_df['participantNumber']:
-                    percentile_participant = stats.percentileofscore(game_df['avgReactionTime'], game_df[game_df['participantNumber'] == participant_num]['avgReactionTime'])[0]
-                    print("participant " + str(participant_num) + " is better than " + str(round(percentile_participant,2)) + "% of participants")
-                    percentile = str(round(percentile_participant,2))
+                    RT_percentile_participant = stats.percentileofscore(game_df['avgReactionTime'], game_df[game_df['participantNumber'] == participant_num]['avgReactionTime'])[0]
+                    print("participant " + str(participant_num) + " is better than " + str(round(RT_percentile_participant,2)) + "% of participants")
+                    RT_percentile = str(round(RT_percentile_participant,2))
+
+                    WM_percentile_participant = stats.percentileofscore(game_df['workingMemMetric'], game_df[game_df['participantNumber'] == participant_num]['workingMemMetric'])[0]
+                    print("participant " + str(participant_num) + " is better than " + str(round(WM_percentile_participant,2)) + "% of participants")
+                    WM_percentile = str(round(WM_percentile_participant,2))
+
+                    RI_percentile_participant = stats.percentileofscore(game_df['responseInhibMetric'], game_df[game_df['participantNumber'] == participant_num]['responseInhibMetric'])[0]
+                    print("participant " + str(participant_num) + " is better than " + str(round(RI_percentile_participant,2)) + "% of participants")
+                    RI_percentile = str(round(RI_percentile_participant,2))
+                    if plot:
+                        plot_histograms(game_df, participant_num, RT_percentile, WM_percentile, RI_percentile)
                 else:
                     print("participant number is invalid or is not present in this game")
-                if plot:
-                    plot_histograms(game_df, participant_num, percentile)
+                
         else:
             print("not a valid file")
     else:
@@ -140,25 +181,29 @@ def study_percentile_check(study_dir, game_dict, study=None, participant_num=0, 
                 #build a new partial dataframe for each game in the study
                 study_df = pd.DataFrame(columns=['participantNumber','avgReactionTime','gameName'])
                 uniq_game = df_pd['name'].unique()
-                percentile_per_game = []
+                RT_percentile = 0
+                WM_percentile = "N/A"
+                RI_percentile = 'N/A'
                 for game in uniq_game:
                     df_filtered = df_pd[df_pd['name'] == game]
-                    uniq = df_filtered['participantNumber'].unique()
-                    #temp_df to store a dataframe for the unique participants per game
-                    temp_df = pd.DataFrame(columns=['participantNumber','avgReactionTime','gameName'])
-                    for i in range(0,len(uniq)):
-                        temp_df.loc[i] = [uniq[i]] + [df_filtered[(df_filtered['participantNumber'] == uniq[i]) & (df_filtered['reactionTime'] >100)]['reactionTime'].mean()] + [game]
-                    #filter out outlier reaction times over 3 times the standard deviation above the mean
-                    mean_rt = temp_df['avgReactionTime'].mean()
-                    std_rt = temp_df['avgReactionTime'].std()
-                    temp_df = temp_df[temp_df.avgReactionTime < mean_rt + (std_rt*3)]
-                    if participant_num != 0 and participant_num in temp_df['participantNumber']:
-                        percentile_participant = stats.percentileofscore(temp_df['avgReactionTime'], temp_df[temp_df['participantNumber'] == participant_num]['avgReactionTime'])[0]
-                        percentile_per_game += [round(percentile_participant,2)]
-                    study_df = study_df.append(temp_df, ignore_index=True)
-                percentile = str(sum(percentile_per_game)/len(percentile_per_game))
+                    game_df = build_game_df(df_filtered)
+                    if participant_num != 0 and participant_num in game_df['participantNumber']:
+                        RT_percentile_participant = stats.percentileofscore(game_df['avgReactionTime'], game_df[game_df['participantNumber'] == participant_num]['avgReactionTime'])[0]
+                        print("participant " + str(participant_num) + " is better than " + str(round(RT_percentile_participant,2)) + "% of participants")
+                        RT_percentile_temp = round(RT_percentile_participant,2)
+                        RT_percentile += RT_percentile_temp
+                        if game in working_memory_games:
+                            WM_percentile_participant = stats.percentileofscore(game_df['workingMemMetric'], game_df[game_df['participantNumber'] == participant_num]['workingMemMetric'])[0]
+                            print("participant " + str(participant_num) + " is better than " + str(round(WM_percentile_participant,2)) + "% of participants")
+                            WM_percentile = str(round(WM_percentile_participant,2))
+                        if game in response_inhibition_games:
+                            RI_percentile_participant = stats.percentileofscore(game_df['responseInhibMetric'], game_df[game_df['participantNumber'] == participant_num]['responseInhibMetric'])[0]
+                            print("participant " + str(participant_num) + " is better than " + str(round(RI_percentile_participant,2)) + "% of participants")
+                            RI_percentile = str(round(RI_percentile_participant,2))
+                    study_df = study_df.append(game_df, ignore_index=True)
+                RT_percentile = str(round(RT_percentile/len(uniq_game),2))
                 if plot:
-                    plot(study_df, participant_num, percentile)
+                    plot_histograms(study_df, participant_num, RT_percentile, WM_percentile, RI_percentile)
         else:
             print("not a valid file")
     else:
@@ -167,11 +212,13 @@ def study_percentile_check(study_dir, game_dict, study=None, participant_num=0, 
                 
 
 
-def plot_histograms(df, participant_num, percentile):
+def plot_histograms(df, participant_num, RT_percentile="N/A", WM_percentile="N/A", RI_percentile="N/A"):
     plt.hist(df['avgReactionTime'])
     plt.title("Histogram for participant #" + str(participant_num))
-    plt.figtext(0.5, 0.01, "\n reaction time percentile: " + percentile + "\n", ha="left")
-    plt.figtext(0.5, 0.01, "working memory metric percentile: 17.28", ha="left")
+    plt.figtext(0.5, 0.01, "\n reaction time percentile: " + RT_percentile \
+                + "\n working memory metric percentile: " + WM_percentile \
+                + "\n response inhibition metric percentile: " + RI_percentile, ha="left")
+    plt.subplots_adjust(bottom=0.17)
     plt.show()
 
 
@@ -198,6 +245,6 @@ if __name__ == "__main__":
     Data_dict = split_by_game(total_pandas, unique_games)
     split_by_df(Data_dict)
     game_dict = final_score_or_RT(games_directory)
-    game_percentile_check(games_directory,game_dict, game="TagMeAgainEasy.csv", participant_num=10, plot=True)
-    #study_percentile_check(studies_directory, game_dict, study="Engagement Study.csv", participant_num=1)
+    #game_percentile_check(games_directory,game_dict, game="TagMeOnly.csv", participant_num=1, plot=True)
+    study_percentile_check(studies_directory, game_dict, study="Engagement Study.csv", participant_num=4, plot=True)
     #feature_count_participants(directory, games_directory)
