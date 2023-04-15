@@ -245,6 +245,6 @@ if __name__ == "__main__":
     Data_dict = split_by_game(total_pandas, unique_games)
     split_by_df(Data_dict)
     game_dict = final_score_or_RT(games_directory)
-    #game_percentile_check(games_directory,game_dict, game="TagMeOnly.csv", participant_num=1, plot=True)
+    game_percentile_check(games_directory,game_dict, game="TagMeOnly.csv", participant_num=1, plot=True)
     study_percentile_check(studies_directory, game_dict, study="Engagement Study.csv", participant_num=4, plot=True)
-    #feature_count_participants(directory, games_directory)
+    feature_count_participants(studies_directory, games_directory)
