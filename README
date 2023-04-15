@@ -1,5 +1,7 @@
 Data-process.py is meant to be editted internally and run depending on given parameters
 
+before use ensure that the directory paths are changed and that there is a separate directory for the study data and the games data. The games data can be populated using the pre-existing functions split_by_df and split_by_game
+
 The main 2 functions are game_percentile_check and study_percentile_check. 
 
 game_percentile_check checks for a participant's performance within a specific game and takes in the main pandas dataframe as an input, along with the games directory, the specific game name, the participant number, and whether we want to plot our results.
